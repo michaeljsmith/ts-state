@@ -1,28 +1,42 @@
-import { State } from "./state";
+export type Stateful<S, T> = {
+  brand?: ["stateful", S, T];
 
-class Stateful<S> {
-  state: S;
+  run: (state: S) => {
+    newState: S;
+    result: T;
+  };
+};
 
-  constructor(state: S) {
-    this.state = state;
-  }
-
-  run<T>(stateToRun: State<S, T>): T {
-    const {newState, result} = stateToRun.run(this.state);
-    this.state = newState;
-    return result;
-  }
+export function get<S>(): Stateful<S, S> {
+  return {
+    run: (state: S) => ({
+      newState: state,
+      result: state,
+    }),
+  };
 }
 
-type StateRunner<S> = <T>(state: State<S, T>) => T;
+export function put<S>(newState: S): Stateful<S, void> {
+  return {
+    run: (initialState: S) => ({
+      newState,
+      result: undefined,
+    }),
+  };
+}
 
-export function statefully<S, T>(fn: (runner: StateRunner<S>) => T): State<S, T> {
+export function statefully<S, T>(fn: (runner: <U>(state: Stateful<S, U>) => U) => T): Stateful<S, T> {
   return {
     run: (initialState: S) => {
-      const stateful = new Stateful<S>(initialState);
-      const value = fn(<U>(stateToRun: State<S, U>) => stateful.run(stateToRun));
+      let state = initialState;
+      const value = fn(
+          <U>(stateToRun: Stateful<S, U>) => {
+            const {newState, result} = stateToRun.run(state);
+            state = newState;
+            return result;
+          });
       return {
-        newState: stateful.state,
+        newState: state,
         result: value,
       }
     }
